@@ -158,7 +158,7 @@ public class CommandChooseSkilltree implements CommandTabCompleter {
                         }
                         event.setWillClose(true);
                         event.setWillDestroy(true);
-                    }, MyPetApi.getPlugin());
+                    }, MyPetApi.getPlugin()).setPaginationIdentifier("ChooseSkilltree");
 
                     ItemDatabase itemDatabase = MyPetApi.getServiceManager().getService(ItemDatabase.class).get();
                     for (int i = 0; i < availableSkilltrees.size(); i++) {

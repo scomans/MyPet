@@ -29,14 +29,10 @@ import de.Keyle.MyPet.api.gui.IconMenuItem;
 import de.Keyle.MyPet.api.player.MyPetPlayer;
 import de.Keyle.MyPet.api.repository.RepositoryCallback;
 import de.Keyle.MyPet.api.util.Colorizer;
-import de.Keyle.MyPet.api.util.EnumSelector;
 import de.Keyle.MyPet.api.util.locale.Translation;
 import de.Keyle.MyPet.api.util.service.types.EggIconService;
 import de.keyle.knbt.TagCompound;
 import de.keyle.knbt.TagInt;
-import org.bukkit.ChatColor;
-import org.bukkit.Material;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
 
@@ -44,135 +40,78 @@ import static org.bukkit.ChatColor.GOLD;
 import static org.bukkit.ChatColor.RESET;
 
 public class MyPetSelectionGui {
-    MyPetPlayer player;
-    String title;
 
-    public MyPetSelectionGui(MyPetPlayer player) {
-        this(player, Translation.getString("Message.SelectMyPet", player));
-    }
+    private final MyPetPlayer player;
+    private final String title;
 
     public MyPetSelectionGui(MyPetPlayer player, String title) {
         this.player = player;
         this.title = title;
     }
 
-    public void open(final RepositoryCallback<StoredMyPet> callback) {
-        MyPetApi.getRepository().getMyPets(player, new RepositoryCallback<List<StoredMyPet>>() {
-            @Override
-            public void callback(List<StoredMyPet> pets) {
-                open(pets, callback);
-            }
-        });
-    }
-
     public void open(List<StoredMyPet> pets, final RepositoryCallback<StoredMyPet> callback) {
-        open(pets, 1, callback);
-    }
+        final Map<Integer, StoredMyPet> petSlotList = new HashMap<>();
+        WorldGroup wg = WorldGroup.getGroupByWorld(player.getPlayer().getWorld().getName());
 
-    public void open(final List<StoredMyPet> pets, int page, final RepositoryCallback<StoredMyPet> callback) {
-        if (pets.size() > 0) {
-            if (page < 1 || Math.ceil(pets.size() / 45.) < page) {
-                page = 1;
-            }
-
-            final Map<Integer, StoredMyPet> petSlotList = new HashMap<>();
-            WorldGroup wg = WorldGroup.getGroupByWorld(player.getPlayer().getWorld().getName());
-
-            Iterator<StoredMyPet> iterator = pets.iterator();
-            while (iterator.hasNext()) {
-                StoredMyPet mypet = iterator.next();
-                if (mypet.getWorldGroup().equals("") || !mypet.getWorldGroup().equals(wg.getName())) {
-                    iterator.remove();
-                }
-
-                if (player.hasMyPet() && player.getMyPet().getUUID().equals(mypet.getUUID())) {
-                    iterator.remove();
+        IconMenu menu = new IconMenu(title, event -> {
+            if (petSlotList.containsKey(event.getPosition())) {
+                StoredMyPet storedMyPet = petSlotList.get(event.getPosition());
+                if (storedMyPet != null && callback != null) {
+                    callback.callback(storedMyPet);
                 }
             }
 
-            final int previousPage = page == 1 ? (int) Math.ceil(pets.size() / 45.) : page - 1;
-            final int nextPage = page == Math.ceil(pets.size() / 45.) ? 1 : page + 1;
+            event.setWillClose(true);
+            event.setWillDestroy(true);
+        }, MyPetApi.getPlugin()).setPaginationIdentifier("SelectMyPet");
 
-            IconMenu menu = new IconMenu(title, event -> {
-                if (event.getPosition() == 45) {
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            open(pets, previousPage, callback);
-                        }
-                    }.runTaskLater(MyPetApi.getPlugin(), 1L);
-                } else if (event.getPosition() == 53) {
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            open(pets, nextPage, callback);
-                        }
-                    }.runTaskLater(MyPetApi.getPlugin(), 1L);
+        int nextPosition = 0;
 
-                } else if (event.getPosition() > 45) {
-                    return;
-                } else if (petSlotList.containsKey(event.getPosition())) {
-                    StoredMyPet storedMyPet = petSlotList.get(event.getPosition());
-                    if (storedMyPet != null && callback != null) {
-                        callback.callback(storedMyPet);
-                    }
-                }
-                event.setWillClose(true);
-                event.setWillDestroy(true);
-            }, MyPetApi.getPlugin());
+        for (StoredMyPet currentPet : pets) {
+            if (currentPet.getWorldGroup().isEmpty() || !currentPet.getWorldGroup().equals(wg.getName()))
+                continue;
 
-            int pagePets = pets.size() - (page - 1) * 45;
-            for (int i = 0; i < pagePets && i <= 45; i++) {
-                StoredMyPet mypet = pets.get(i + ((page - 1) * 45));
+            if (player.hasMyPet() && player.getMyPet().getUUID().equals(currentPet.getUUID()))
+                continue;
 
-                List<String> lore = new ArrayList<>();
-                if (Configuration.HungerSystem.USE_HUNGER_SYSTEM) {
-                    lore.add(RESET + Translation.getString("Name.Hunger", player) + ": " + GOLD + Math.round(mypet.getSaturation()));
-                }
-                if (mypet.getRespawnTime() > 0) {
-                    lore.add(RESET + Translation.getString("Name.Respawntime", player) + ": " + GOLD + mypet.getRespawnTime() + "sec");
-                } else {
-                    lore.add(RESET + Translation.getString("Name.HP", player) + ": " + GOLD + String.format("%1.2f", mypet.getHealth()));
-                }
-                boolean levelFound = false;
-                if (mypet.getInfo().containsKey("storage")) {
-                    TagCompound storage = mypet.getInfo().getAs("storage", TagCompound.class);
-                    if (storage.containsKey("level")) {
-                        lore.add(RESET + Translation.getString("Name.Level", player) + ": " + GOLD + storage.getAs("level", TagInt.class).getIntData());
-                        levelFound = true;
-                    }
-                }
-                if (!levelFound) {
-                    lore.add(RESET + Translation.getString("Name.Exp", player) + ": " + GOLD + String.format("%1.2f", mypet.getExp()));
-                }
-                lore.add(RESET + Translation.getString("Name.Type", player) + ": " + GOLD + Translation.getString("Name." + mypet.getPetType().name(), player));
-                lore.add(RESET + Translation.getString("Name.Skilltree", player) + ": " + GOLD + Colorizer.setColors(mypet.getSkilltree() != null ? mypet.getSkilltree().getDisplayName() : "-"));
+            List<String> lore = new ArrayList<>();
 
-                IconMenuItem icon = new IconMenuItem();
-                icon.setTitle(RESET + mypet.getPetName());
-                icon.addLore(lore);
-                Optional<EggIconService> egg = MyPetApi.getServiceManager().getService(EggIconService.class);
-                egg.ifPresent(service -> service.updateIcon(mypet.getPetType(), icon));
+            if (Configuration.HungerSystem.USE_HUNGER_SYSTEM)
+                lore.add(RESET + Translation.getString("Name.Hunger", player) + ": " + GOLD + Math.round(currentPet.getSaturation()));
 
-                int pos = menu.addOption(icon);
-                petSlotList.put(pos, mypet);
+            if (currentPet.getRespawnTime() > 0) {
+                lore.add(RESET + Translation.getString("Name.Respawntime", player) + ": " + GOLD + currentPet.getRespawnTime() + "sec");
+            } else {
+                lore.add(RESET + Translation.getString("Name.HP", player) + ": " + GOLD + String.format("%1.2f", currentPet.getHealth()));
             }
 
-            if (previousPage != page) {
-                menu.setOption(45, new IconMenuItem()
-                        .setMaterial(EnumSelector.find(Material.class, "SIGN", "OAK_SIGN"))
-                        .setTitle("" + previousPage + " ≪≪")
-                );
+            boolean levelFound = false;
+            if (currentPet.getInfo().containsKey("storage")) {
+                TagCompound storage = currentPet.getInfo().getAs("storage", TagCompound.class);
+                if (storage.containsKey("level")) {
+                    lore.add(RESET + Translation.getString("Name.Level", player) + ": " + GOLD + storage.getAs("level", TagInt.class).getIntData());
+                    levelFound = true;
+                }
             }
 
-            if (previousPage != page) {
-                menu.setOption(53, new IconMenuItem()
-                        .setMaterial(EnumSelector.find(Material.class, "SIGN", "OAK_SIGN"))
-                        .setTitle(ChatColor.BOLD + "≫≫ " + ChatColor.RESET + nextPage)
-                );
-            }
+            if (!levelFound)
+                lore.add(RESET + Translation.getString("Name.Exp", player) + ": " + GOLD + String.format("%1.2f", currentPet.getExp()));
 
-            menu.open(player.getPlayer()); 
+            lore.add(RESET + Translation.getString("Name.Type", player) + ": " + GOLD + Translation.getString("Name." + currentPet.getPetType().name(), player));
+            lore.add(RESET + Translation.getString("Name.Skilltree", player) + ": " + GOLD + Colorizer.setColors(currentPet.getSkilltree() != null ? currentPet.getSkilltree().getDisplayName() : "-"));
+
+            IconMenuItem icon = new IconMenuItem();
+            icon.setTitle(RESET + currentPet.getPetName());
+            icon.addLore(lore);
+            Optional<EggIconService> egg = MyPetApi.getServiceManager().getService(EggIconService.class);
+            egg.ifPresent(service -> service.updateIcon(currentPet.getPetType(), icon));
+
+            int currentPosition = nextPosition++;
+
+            menu.setOption(currentPosition, icon);
+            petSlotList.put(currentPosition, currentPet);
         }
+
+        menu.open(player.getPlayer());
     }
 }

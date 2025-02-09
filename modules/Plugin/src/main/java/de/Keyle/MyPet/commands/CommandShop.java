@@ -21,7 +21,6 @@
 package de.Keyle.MyPet.commands;
 
 import de.Keyle.MyPet.MyPetApi;
-import de.Keyle.MyPet.api.Util;
 import de.Keyle.MyPet.api.WorldGroup;
 import de.Keyle.MyPet.api.commands.CommandTabCompleter;
 import de.Keyle.MyPet.api.gui.IconMenu;
@@ -120,30 +119,31 @@ public class CommandShop implements CommandTabCompleter {
                                 event.setWillClose(true);
                                 event.setWillDestroy(true);
                             }
-                        }, MyPetApi.getPlugin());
+                        }, MyPetApi.getPlugin()).setPaginationIdentifier("AvailableShops");
 
                         ItemDatabase itemDatabase = MyPetApi.getServiceManager().getService(ItemDatabase.class).get();
 
+                        Queue<PetShop> filler = new ArrayDeque<>();
+
                         for (String shopname : availableShops) {
                             PetShop s = shopManager.get().getShop(shopname);
-                            IconMenuItem icon = new IconMenuItem();
-                            icon.setTitle(RESET + Colorizer.setColors(s.getDisplayName()));
 
-                            SkilltreeIcon si = s.getIcon();
-                            MaterialHolder material = itemDatabase.getByID(si.getMaterial());
-                            if (material == null) {
-                                material = itemDatabase.getByID("chest");
+                            int position = s.getPosition();
+
+                            if (position < 0) {
+                                filler.add(s);
+                                continue;
                             }
-                            icon.setMaterial(material.getMaterial()).setGlowing(si.isGlowing());
-                            if (material.isLegacy()) {
-                                icon.setData(material.getLegacyId().getData());
-                            }
-                            if (Util.isBetween(0, 53, s.getPosition())) {
-                                menu.setOption(s.getPosition(), icon);
-                                shops.put(s.getPosition(), s.getName());
-                            } else {
-                                shops.put(menu.addOption(icon), s.getName());
-                            }
+
+                            menu.setOption(position, makeShopIcon(s, itemDatabase));
+                            shops.put(position, s.getName());
+                        }
+
+                        while (!filler.isEmpty()) {
+                            PetShop s = filler.poll();
+
+                            int position = menu.addOption(makeShopIcon(s, itemDatabase));
+                            shops.put(position, s.getName());
                         }
 
                         menu.open(player);
@@ -155,6 +155,23 @@ public class CommandShop implements CommandTabCompleter {
         }
 
         return true;
+    }
+
+    private IconMenuItem makeShopIcon(PetShop s, ItemDatabase itemDatabase) {
+        IconMenuItem icon = new IconMenuItem();
+        icon.setTitle(RESET + Colorizer.setColors(s.getDisplayName()));
+
+        SkilltreeIcon si = s.getIcon();
+        MaterialHolder material = itemDatabase.getByID(si.getMaterial());
+        if (material == null) {
+            material = itemDatabase.getByID("chest");
+        }
+        icon.setMaterial(material.getMaterial()).setGlowing(si.isGlowing());
+        if (material.isLegacy()) {
+            icon.setData(material.getLegacyId().getData());
+        }
+
+        return icon;
     }
 
     @Override
