@@ -272,6 +272,11 @@ public class CommandTrade implements CommandTabCompleter {
             if (offers.containsKey(((Player) sender).getUniqueId())) {
                 return filterTabCompletionResults(tradeList, strings[0]);
             }
+            List<String> playerNames = new ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                playerNames.add(player.getName());
+            }
+            return filterTabCompletionResults(playerNames, strings[0]);
         }
         return Collections.emptyList();
     }
